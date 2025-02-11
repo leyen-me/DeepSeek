@@ -1,8 +1,8 @@
 import { useState } from "react";
 import Markdown from "react-markdown";
 
-let controller = null;
-let signal = null;
+const controller = new AbortController();
+const signal = controller.signal;
 
 function App() {
   const [messages, setMessages] = useState([]);
@@ -19,9 +19,6 @@ function App() {
             : message.content,
       };
     });
-    controller = new AbortController();
-    signal = controller.signal;
-    let reader;
     fetch("https://ds.leyen.me/stream", {
       method: "POST",
       headers: {
@@ -32,7 +29,7 @@ function App() {
       signal,
     })
       .then((response) => {
-        reader = response.body.getReader();
+        let reader = response.body.getReader();
         let accumulatedContent = "";
         let lastAccumulatedContent = "";
         let lastAnswer = false;
@@ -45,30 +42,35 @@ function App() {
             }
             const text = new TextDecoder().decode(value);
             // 如果碰到=== Final Answer ===，则是最后回答
+            console.log('====>',text);
+            
             if (text.includes("=== Final Answer ===")) {
               lastAnswer = true;
+              readStream();
               return;
             }
             if (lastAnswer) {
               lastAccumulatedContent += text;
-              setMessages((prev) => [
-                ...prev.slice(0, -1),
-                {
+              setMessages((prev) => {
+                const prevMessages = [...prev];
+                prevMessages[prevMessages.length - 1] = {
                   role: "assistant",
                   content: accumulatedContent,
                   lastAnswer: lastAccumulatedContent,
-                },
-              ]);
+                };
+                return prevMessages;
+              });
             } else {
               accumulatedContent += text;
-              setMessages((prev) => [
-                ...prev.slice(0, -1),
-                {
+              setMessages((prev) => {
+                const prevMessages = [...prev];
+                prevMessages[prevMessages.length - 1] = {
                   role: "assistant",
                   content: accumulatedContent,
                   lastAnswer: "",
-                },
-              ]);
+                };
+                return prevMessages;
+              });
             }
             readStream();
           });
@@ -86,12 +88,8 @@ function App() {
       });
 
     return () => {
-      if (reader) {
-        reader.cancel().catch(console.error);
-      }
       if (controller) {
         controller.abort();
-        controller = null;
       }
     };
   };
@@ -100,7 +98,6 @@ function App() {
     if (isSending) {
       if (controller) {
         controller.abort();
-        controller = null;
       }
       setIsSending(false);
       return;
@@ -109,6 +106,7 @@ function App() {
       ...messages,
       // { role: Math.random() > 0.5 ? "user" : "assistant", content: message },
       { role: "user", content: message },
+      { role: "assistant", content: "", lastAnswer: "" }
     ];
     setMessages(newMessages);
     setMessage("");

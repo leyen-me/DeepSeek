@@ -486,7 +486,7 @@ function App() {
         </header>
 
         {/* Main Content */}
-        {messages.length > 0 ? (
+        {messages.length > 1 ? (
           <main
             ref={mainRef}
             style={{

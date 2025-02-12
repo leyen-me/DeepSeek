@@ -1,8 +1,17 @@
-import { useState, useRef } from "react";
+import { useState, useEffect, useRef } from "react";
 import Markdown from "react-markdown";
-import { Input, Modal } from "antd";
+import { Input, Modal, Drawer, Divider, Button } from "antd";
+import { nanoid } from "nanoid";
 
 const { TextArea } = Input;
+
+const tryJsonParse = (value) => {
+  try {
+    return JSON.parse(value);
+  } catch (error) {
+    return [];
+  }
+};
 
 function App() {
   const [messages, setMessages] = useState([
@@ -17,6 +26,88 @@ function App() {
   const [isSending, setIsSending] = useState(false);
   const [title, setTitle] = useState("新对话");
   const [isSystemOpen, setIsSystemOpen] = useState(false);
+  const [drawerOpen, setDrawerOpen] = useState(false);
+
+  // All messages
+  const [allMessages, setAllMessages] = useState(
+    tryJsonParse(localStorage.getItem("all_messages")) || []
+  );
+  const [activeMessage, setActiveMessage] = useState("");
+
+  const [groupedMessages, setGroupedMessages] = useState({
+    today: [],
+    yesterday: [],
+    week: [],
+    month: [],
+    older: [],
+  });
+
+  // Add computed function for message grouping
+  const computeGroupedMessages = (messages) => {
+    const now = new Date();
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const yesterday = new Date(today);
+    yesterday.setDate(yesterday.getDate() - 1);
+    const weekAgo = new Date(today);
+    weekAgo.setDate(weekAgo.getDate() - 7);
+    const monthAgo = new Date(today);
+    monthAgo.setDate(monthAgo.getDate() - 30);
+
+    // Sort messages by createdAt in descending order
+    const sortedMessages = [...messages].sort(
+      (a, b) => new Date(b.createdAt) - new Date(a.createdAt)
+    );
+
+    return {
+      today: sortedMessages.filter((msg) => new Date(msg.createdAt) >= today),
+      yesterday: sortedMessages.filter(
+        (msg) =>
+          new Date(msg.createdAt) >= yesterday &&
+          new Date(msg.createdAt) < today
+      ),
+      week: sortedMessages.filter(
+        (msg) =>
+          new Date(msg.createdAt) >= weekAgo &&
+          new Date(msg.createdAt) < yesterday
+      ),
+      month: sortedMessages.filter(
+        (msg) =>
+          new Date(msg.createdAt) >= monthAgo &&
+          new Date(msg.createdAt) < weekAgo
+      ),
+      older: sortedMessages.filter((msg) => new Date(msg.createdAt) < monthAgo),
+    };
+  };
+
+  // Add useEffect to update groupedMessages when allMessages changes
+  useEffect(() => {
+    let _messages = [...allMessages];
+    const _activeMessage = _messages.find(
+      (message) => message.id === activeMessage
+    );
+    if (_activeMessage) {
+      _activeMessage.list = messages;
+    }
+    setAllMessages(_messages);
+  }, [messages]);
+
+  useEffect(() => {
+    setGroupedMessages(computeGroupedMessages(allMessages));
+    localStorage.setItem("all_messages", JSON.stringify(allMessages));
+  }, [allMessages]);
+
+  useEffect(() => {
+    if (!activeMessage) {
+      setTitle("新对话");
+    }
+    const _activeMessage = allMessages.find(
+      (message) => message.id === activeMessage
+    );
+    if (_activeMessage) {
+      setMessages(_activeMessage.list);
+      setTitle(_activeMessage.list[1].content);
+    }
+  }, [activeMessage]);
 
   const controllerRef = useRef(null);
   // Add ref for main container
@@ -46,6 +137,14 @@ function App() {
     localStorage.setItem("system_prompt", value);
   };
 
+  const handleOpenDrawer = () => {
+    setDrawerOpen(true);
+  };
+
+  const handleCloseDrawer = () => {
+    setDrawerOpen(false);
+  };
+
   const getStream = (newMessages) => {
     // 创建新的 AbortController
     controllerRef.current = new AbortController();
@@ -55,7 +154,7 @@ function App() {
         role: message.role,
         content:
           message.role === "assistant"
-            ? message.content + message.lastAnswer
+            ? message.lastAnswer
             : message.content,
       };
     });
@@ -201,13 +300,23 @@ function App() {
   };
 
   const handleSendMessage = () => {
+    if (message.trim() === "") {
+      return;
+    }
     if (isSending) {
       handleStop();
       return;
     }
+    if (!activeMessage) {
+      let id = nanoid();
+      setActiveMessage(id);
+      setAllMessages([
+        { id, createdAt: new Date(), list: messages },
+        ...allMessages,
+      ]);
+    }
     let newMessages = [
       ...messages,
-      // { role: Math.random() > 0.5 ? "user" : "assistant", content: message },
       { role: "user", content: message },
       {
         role: "assistant",
@@ -284,8 +393,17 @@ function App() {
       },
     ]);
 
+    setActiveMessage("");
     setMessage("");
     setTitle("新对话");
+  };
+
+  const handleClear = () => {
+    // 停止当前对话
+    handleStop();
+    setAllMessages([]);
+    setActiveMessage("");
+    handleCloseDrawer();
   };
 
   return (
@@ -303,7 +421,10 @@ function App() {
             justifyContent: "space-between",
           }}
         >
-          <button style={{ border: "none", background: "none" }}>
+          <button
+            style={{ border: "none", background: "none" }}
+            onClick={handleOpenDrawer}
+          >
             <svg
               width="28"
               height="28"
@@ -793,7 +914,171 @@ function App() {
           </div>
         </footer>
       </div>
+      <Drawer
+        placement="left"
+        size="default"
+        width={300}
+        closable={false}
+        onClose={handleCloseDrawer}
+        open={drawerOpen}
+        key="left"
+      >
+        <div
+          style={{ display: "flex", flexDirection: "column", height: "100%" }}
+        >
+          <ul style={{ flex: 1, height: 0, overflow: "auto" }}>
+            {/* 今天 */}
+            {groupedMessages.today.length > 0 && (
+              <li style={{ marginBottom: "12px" }}>
+                <span style={{ color: "#999", fontSize: "14px" }}>今天</span>
+                <ul style={{ marginTop: "12px" }}>
+                  {groupedMessages.today.map((message) => (
+                    <li
+                      onClick={() => {
+                        setActiveMessage(message.id);
+                        handleCloseDrawer();
+                      }}
+                      key={message.id}
+                      className="menu-item"
+                      style={{
+                        marginTop: "4px",
+                        height: 44,
+                        lineHeight: "44px",
+                        width: "100%",
+                        overflow: "hidden",
+                        textOverflow: "ellipsis",
+                        whiteSpace: "nowrap",
+                      }}
+                    >
+                      {message.list[1].content}
+                    </li>
+                  ))}
+                </ul>
+              </li>
+            )}
 
+            {/* 昨天 */}
+            {groupedMessages.yesterday.length > 0 && (
+              <li style={{ marginBottom: "12px" }}>
+                <span style={{ color: "#999", fontSize: "14px" }}>昨天</span>
+                <ul style={{ marginTop: "12px" }}>
+                  {groupedMessages.yesterday.map((message) => (
+                    <li
+                      onClick={() => {
+                        setActiveMessage(message.id);
+                        handleCloseDrawer();
+                      }}
+                      key={message.id}
+                      className="menu-item"
+                      style={{
+                        marginTop: "4px",
+                        height: 44,
+                        lineHeight: "44px",
+                        width: "100%",
+                        overflow: "hidden",
+                        textOverflow: "ellipsis",
+                        whiteSpace: "nowrap",
+                      }}
+                    >
+                      {message.list[1].content}
+                    </li>
+                  ))}
+                </ul>
+              </li>
+            )}
+
+            {/* 本周 */}
+            {groupedMessages.week.length > 0 && (
+              <li style={{ marginBottom: "12px" }}>
+                <span style={{ color: "#999", fontSize: "14px" }}>本周</span>
+                <ul style={{ marginTop: "12px" }}>
+                  {groupedMessages.week.map((message) => (
+                    <li
+                      onClick={() => {
+                        setActiveMessage(message.id);
+                        handleCloseDrawer();
+                      }}
+                      key={message.id}
+                      className="menu-item"
+                      style={{
+                        marginTop: "4px",
+                        height: 44,
+                        lineHeight: "44px",
+                        width: "100%",
+                        overflow: "hidden",
+                        textOverflow: "ellipsis",
+                        whiteSpace: "nowrap",
+                      }}
+                    >
+                      {message.list[1].content}
+                    </li>
+                  ))}
+                </ul>
+              </li>
+            )}
+
+            {/* 本月 */}
+            {groupedMessages.month.length > 0 && (
+              <li style={{ marginBottom: "12px" }}>
+                <span style={{ color: "#999", fontSize: "14px" }}>本月</span>
+                <ul style={{ marginTop: "12px" }}>
+                  {groupedMessages.month.map((message) => (
+                    <li
+                      onClick={() => {
+                        setActiveMessage(message.id);
+                        handleCloseDrawer();
+                      }}
+                      key={message.id}
+                      className="menu-item"
+                      style={{
+                        marginTop: "4px",
+                        height: 44,
+                        lineHeight: "44px",
+                        width: "100%",
+                        overflow: "hidden",
+                        textOverflow: "ellipsis",
+                        whiteSpace: "nowrap",
+                      }}
+                    >
+                      {message.list[1].content}
+                    </li>
+                  ))}
+                </ul>
+              </li>
+            )}
+
+            {/* 更早 */}
+            {groupedMessages.older.length > 0 && (
+              <li style={{ marginBottom: "12px" }}>
+                <span style={{ color: "#999", fontSize: "14px" }}>更早</span>
+                <ul style={{ marginTop: "12px" }}>
+                  {groupedMessages.older.map((message) => (
+                    <li
+                      onClick={() => {
+                        setActiveMessage(message.id);
+                        handleCloseDrawer();
+                      }}
+                      key={message.id}
+                      className="menu-item"
+                      style={{
+                        marginTop: "4px",
+                        height: 44,
+                        lineHeight: "44px",
+                      }}
+                    >
+                      {message.list[1].content}
+                    </li>
+                  ))}
+                </ul>
+              </li>
+            )}
+          </ul>
+          <Divider />
+          <Button type="dashed" danger onClick={handleClear}>
+            一键清空
+          </Button>
+        </div>
+      </Drawer>
       <Modal
         title="系统提示"
         open={isSystemOpen}

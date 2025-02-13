@@ -153,9 +153,7 @@ function App() {
       return {
         role: message.role,
         content:
-          message.role === "assistant"
-            ? message.lastAnswer
-            : message.content,
+          message.role === "assistant" ? message.lastAnswer : message.content,
       };
     });
     fetch("https://ds.leyen.me/stream", {
@@ -190,9 +188,13 @@ function App() {
                 return;
               }
               const text = new TextDecoder().decode(value);
+              console.log("=======>", text);
+
               // 如果碰到=== Final Answer ===，则是最后回答
               if (text.includes("=== Final Answer ===")) {
                 lastAnswer = true;
+                let _text = text.replace("=== Final Answer ===", "");
+                lastAccumulatedContent += _text;
                 setMessages((prev) => {
                   const prevMessages = [...prev];
                   prevMessages[prevMessages.length - 1][
@@ -203,6 +205,8 @@ function App() {
                   ] = true;
                   prevMessages[prevMessages.length - 1]["contentEndTime"] =
                     new Date();
+                  prevMessages[prevMessages.length - 1]["lastAnswer"] =
+                    lastAccumulatedContent;
                   prevMessages[prevMessages.length - 1]["contentDuration"] =
                     Math.round(
                       (prevMessages[prevMessages.length - 1]["contentEndTime"] -
@@ -300,11 +304,11 @@ function App() {
   };
 
   const handleSendMessage = () => {
-    if (message.trim() === "") {
-      return;
-    }
     if (isSending) {
       handleStop();
+      return;
+    }
+    if (message.trim() === "") {
       return;
     }
     if (!activeMessage) {

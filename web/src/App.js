@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import Markdown from "react-markdown";
-import { Input, Modal, Drawer, Divider, Button } from "antd";
+import { Input, Modal, Drawer, Divider, Button, Collapse } from "antd";
 import { nanoid } from "nanoid";
 import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
 import { vscDarkPlus } from "react-syntax-highlighter/dist/esm/styles/prism";
@@ -229,24 +229,39 @@ function App() {
     setDrawerOpen(false);
   };
 
+  const getMessage = (newMessages) => {
+    let _newMessages1 = newMessages.map((message) => {
+      // 如果system prompt是空，则不加入
+      if (message.role === "system" && message.content.trim() === "") {
+        return null;
+      }
+      return {
+        role: message.role,
+        content:
+          message.role === "assistant"
+            ? message.lastAnswer
+              ? message.lastAnswer
+              : message.content
+            : message.content,
+      };
+    });
+    let _newMessages2 = _newMessages1.filter(
+      (message) => message != null && message.content.trim() !== ""
+    );
+    return _newMessages2;
+  };
+
   const getStream = (newMessages) => {
     // 创建新的 AbortController
     controllerRef.current = new AbortController();
 
-    let _newMessages = newMessages.map((message) => {
-      return {
-        role: message.role,
-        content:
-          message.role === "assistant" ? message.lastAnswer : message.content,
-      };
-    });
     fetch("https://ds.leyen.me/stream", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
         Accept: "text/event-stream",
       },
-      body: JSON.stringify(_newMessages),
+      body: JSON.stringify(getMessage(newMessages)),
       signal: controllerRef.current.signal,
     })
       .then((response) => {
@@ -449,9 +464,12 @@ function App() {
     }
   };
 
-  const handleRefresh = () => {
-    // 清空对象
-    const newMessages = [...messages];
+  const handleRefresh = (message) => {
+    // 删除当前位置以后的所有对话
+    const index = messages.findIndex((m) => m === message);
+    const newMessages = messages.slice(0, index + 1);
+
+    // 初始化最后一条对话
     newMessages[newMessages.length - 1]["role"] = "assistant";
     newMessages[newMessages.length - 1]["content"] = "";
     newMessages[newMessages.length - 1]["contentLoading"] = true;
@@ -601,7 +619,13 @@ function App() {
                 >
                   {message.role === "assistant" ? (
                     <div style={{ width: "100%" }}>
-                      <div style={{ display: "flex", alignItems: "center" }}>
+                      <div
+                        style={{
+                          display: "flex",
+                          width: "100%",
+                          justifyContent: "flex-start",
+                        }}
+                      >
                         <div
                           style={{
                             width: "36px",
@@ -611,6 +635,7 @@ function App() {
                             justifyContent: "center",
                             borderRadius: "999px",
                             border: "1.5px solid #D5D5D5",
+                            marginTop: "5.5px",
                           }}
                         >
                           <img
@@ -619,50 +644,42 @@ function App() {
                             alt="assistant"
                           />
                         </div>
-                        {message.contentLoading &&
-                        message.contentDuration === null ? (
-                          <div style={{ marginLeft: "12px", color: "#767676" }}>
-                            思考中...
-                          </div>
-                        ) : (
-                          <div style={{ marginLeft: "12px", color: "#767676" }}>
-                            已深度思考 （用时 {message.contentDuration} 秒）
-                          </div>
-                        )}
-                        <svg
-                          style={{ marginLeft: "12px" }}
-                          viewBox="0 0 1024 1024"
-                          version="1.1"
-                          xmlns="http://www.w3.org/2000/svg"
-                          width="22px"
-                          height="22px"
-                        >
-                          <path
-                            d="M512 330.666667c14.933333 0 29.866667 4.266667 40.533333 14.933333l277.33333399 234.666667c27.733333 23.466667 29.866667 64 8.53333301 89.6-23.466667 27.733333-64 29.866667-89.6 8.53333299L512 477.866667l-236.8 200.53333299c-27.733333 23.466667-68.266667 19.19999999-89.6-8.53333299-23.466667-27.733333-19.19999999-68.266667 8.53333301-89.6l277.33333399-234.666667c10.666667-10.666667 25.6-14.933333 40.533333-14.933333z"
-                            fill="#767676"
-                          ></path>
-                        </svg>
+                        {
+                          <Collapse
+                            style={{ width: "0", flex: 1 }}
+                            defaultActiveKey={["1"]}
+                            ghost
+                            items={[
+                              {
+                                key: "1",
+                                label:
+                                  message.contentLoading &&
+                                  message.contentDuration === null
+                                    ? "思考中..."
+                                    : `已深度思考 （用时 ${message.contentDuration} 秒）`,
+                                children: (
+                                  <p
+                                    style={{
+                                      letterSpacing: "1px",
+                                      paddingLeft: "12px",
+                                      fontSize: "14px",
+                                      lineHeight: "24px",
+                                      borderLeft: "1.5px solid #E4E4E4",
+                                      color: "#767676",
+                                    }}
+                                  >
+                                    {message.content}
+                                  </p>
+                                ),
+                              },
+                            ]}
+                          />
+                        }
                       </div>
                       <div
                         style={{
                           maxWidth: "100%",
-                          padding: "4px 16px",
-                          marginLeft: "48px",
-                          lineHeight: "28px",
-                          fontSize: "16px",
-                          letterSpacing: "2px",
-                          color: "#767676",
-                          borderLeft: "1.5px solid #E4E4E4",
-                          backgroundColor:
-                            message.role === "user" ? "#EBF3FE" : "transparent",
-                        }}
-                      >
-                        <p>{message.content}</p>
-                      </div>
-                      <div
-                        style={{
-                          maxWidth: "100%",
-                          padding: "4px 16px",
+                          padding: "0px 16px",
                           marginLeft: "32px",
                           lineHeight: "28px",
                           fontSize: "16px",
@@ -675,6 +692,11 @@ function App() {
                           remarkPlugins={[remarkMath, remarkGfm]}
                           rehypePlugins={[rehypeKatex]}
                           components={{
+                            p: ({ children }) => (
+                              <div style={{ margin: "0.5em 0" }}>
+                                {children}
+                              </div>
+                            ),
                             table: ({ children }) => (
                               <table
                                 style={{
@@ -746,7 +768,8 @@ function App() {
                         >
                           {message.lastAnswer}
                         </Markdown>
-                        {message.lastAnswer && !message.lastAnswerLoading && (
+                        {((message.lastAnswer && !message.lastAnswerLoading) ||
+                          (message.content && !message.lastAnswerLoading)) && (
                           <div
                             style={{
                               display: "flex",
@@ -780,7 +803,7 @@ function App() {
                               xmlns="http://www.w3.org/2000/svg"
                               width="16"
                               height="16"
-                              onClick={handleRefresh}
+                              onClick={() => handleRefresh(message)}
                             >
                               <path
                                 d="M13.653333 45.83619h975.238096v975.238096h-975.238096z"
@@ -811,7 +834,9 @@ function App() {
                             </svg>
 
                             <svg
-                              style={{ transform: "rotate(180deg) scaleX(-1)" }}
+                              style={{
+                                transform: "rotate(180deg) scaleX(-1)",
+                              }}
                               viewBox="0 0 1024 1024"
                               version="1.1"
                               xmlns="http://www.w3.org/2000/svg"
@@ -896,6 +921,14 @@ function App() {
             className="deepseek-message-input"
             styles={{
               borderRadius: "24px",
+            }}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                if (!e.shiftKey) {
+                  e.preventDefault(); // 阻止默认的换行行为
+                  handleSendMessage();
+                }
+              }
             }}
           />
 
@@ -1030,7 +1063,7 @@ function App() {
                   color: "#fff",
                   opacity: message.length || isSending ? 1 : 0.4,
                 }}
-                onClick={() => {
+                onClick={(e) => {
                   handleSendMessage();
                 }}
               >

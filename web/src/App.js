@@ -2,6 +2,11 @@ import { useState, useEffect, useRef } from "react";
 import Markdown from "react-markdown";
 import { Input, Modal, Drawer, Divider, Button } from "antd";
 import { nanoid } from "nanoid";
+import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
+import { vscDarkPlus } from "react-syntax-highlighter/dist/esm/styles/prism";
+import remarkMath from "remark-math";
+import rehypeKatex from "rehype-katex";
+import remarkGfm from "remark-gfm";
 
 const { TextArea } = Input;
 
@@ -11,6 +16,67 @@ const tryJsonParse = (value) => {
   } catch (error) {
     return [];
   }
+};
+
+const CodeBlock = ({ language, children }) => {
+  const [copied, setCopied] = useState(false);
+  const [showButton, setShowButton] = useState(false);
+
+  const handleCopy = async (e) => {
+    e.stopPropagation();
+    await navigator.clipboard.writeText(children);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  return (
+    <div
+      style={{ position: "relative", borderRadius: "6px", margin: "8px 0" }}
+      onMouseEnter={() => setShowButton(true)}
+      onMouseLeave={() => setShowButton(false)}
+    >
+      {showButton && (
+        <button
+          onClick={handleCopy}
+          style={{
+            position: "absolute",
+            right: "8px",
+            top: "8px",
+            padding: "4px 8px",
+            background: "rgba(255,255,255,0.1)",
+            border: "none",
+            borderRadius: "4px",
+            color: "#fff",
+            fontSize: "12px",
+            cursor: "pointer",
+            zIndex: 2,
+          }}
+        >
+          {copied ? "已复制" : "复制"}
+        </button>
+      )}
+      <SyntaxHighlighter
+        style={vscDarkPlus}
+        language={language}
+        PreTag="div"
+        className="syntax-code"
+        customStyle={{
+          margin: 0,
+          whiteSpace: "pre-wrap",
+          wordBreak: "break-all",
+          wordWrap: "break-word",
+          overflowX: "hidden",
+          maxWidth: "100%",
+          borderRadius: "6px",
+          padding: "12px",
+        }}
+        wrapLines={true}
+        wrapLongLines={true}
+      >
+        {String(children).replace(/\n$/, "")}
+      </SyntaxHighlighter>
+    </div>
+  );
 };
 
 function App() {
@@ -27,6 +93,8 @@ function App() {
   const [title, setTitle] = useState("新对话");
   const [isSystemOpen, setIsSystemOpen] = useState(false);
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const [shouldAutoScroll, setShouldAutoScroll] = useState(true);
+  const isScrollingRef = useRef(false);
 
   // All messages
   const [allMessages, setAllMessages] = useState(
@@ -113,10 +181,26 @@ function App() {
   // Add ref for main container
   const mainRef = useRef(null);
 
+  const userScrolledRef = useRef(false);
   // Add scroll helper function
   const scrollToBottom = () => {
-    if (mainRef.current) {
+    if (mainRef.current && shouldAutoScroll && !userScrolledRef.current) {
+      isScrollingRef.current = true;
       mainRef.current.scrollTop = mainRef.current.scrollHeight;
+    }
+  };
+  const handleScroll = (e) => {
+    if (e.isTrusted) {
+      userScrolledRef.current = true;
+      const { scrollTop, scrollHeight, clientHeight } = mainRef.current;
+      const isAtBottom = scrollHeight - scrollTop - clientHeight < 50;
+
+      if (isAtBottom) {
+        userScrolledRef.current = false;
+        setShouldAutoScroll(true);
+      } else {
+        setShouldAutoScroll(false);
+      }
     }
   };
 
@@ -188,8 +272,6 @@ function App() {
                 return;
               }
               const text = new TextDecoder().decode(value);
-              console.log("=======>", text);
-
               // 如果碰到=== Final Answer ===，则是最后回答
               if (text.includes("=== Final Answer ===")) {
                 lastAnswer = true;
@@ -311,6 +393,8 @@ function App() {
     if (message.trim() === "") {
       return;
     }
+    userScrolledRef.current = false;
+    setShouldAutoScroll(true);
     if (!activeMessage) {
       let id = nanoid();
       setActiveMessage(id);
@@ -493,6 +577,7 @@ function App() {
         {messages.length > 1 ? (
           <main
             ref={mainRef}
+            onScroll={handleScroll}
             style={{
               flex: 1,
               height: 0,
@@ -511,10 +596,11 @@ function App() {
                     justifyContent:
                       message.role === "user" ? "flex-end" : "flex-start",
                     marginBottom: "20px",
+                    width: "100%",
                   }}
                 >
                   {message.role === "assistant" ? (
-                    <div>
+                    <div style={{ width: "100%" }}>
                       <div style={{ display: "flex", alignItems: "center" }}>
                         <div
                           style={{
@@ -585,7 +671,81 @@ function App() {
                         }}
                       >
                         {/* https://github.com/remarkjs/react-markdown */}
-                        <Markdown>{message.lastAnswer}</Markdown>
+                        <Markdown
+                          remarkPlugins={[remarkMath, remarkGfm]}
+                          rehypePlugins={[rehypeKatex]}
+                          components={{
+                            table: ({ children }) => (
+                              <table
+                                style={{
+                                  borderCollapse: "collapse",
+                                  width: "100%",
+                                  margin: "1em 0",
+                                }}
+                              >
+                                {children}
+                              </table>
+                            ),
+                            th: ({ children }) => (
+                              <th
+                                style={{
+                                  border: "1px solid #ddd",
+                                  padding: "8px",
+                                  backgroundColor: "#f5f5f5",
+                                }}
+                              >
+                                {children}
+                              </th>
+                            ),
+                            td: ({ children }) => (
+                              <td
+                                style={{
+                                  border: "1px solid #ddd",
+                                  padding: "8px",
+                                }}
+                              >
+                                {children}
+                              </td>
+                            ),
+                            pre: ({ children }) => children,
+                            code: ({
+                              node,
+                              inline,
+                              className,
+                              children,
+                              ...props
+                            }) => {
+                              const match = /language-(\w+)/.exec(
+                                className || ""
+                              );
+                              const language = match ? match[1] : "";
+
+                              return !inline ? (
+                                <CodeBlock language={language}>
+                                  {children}
+                                </CodeBlock>
+                              ) : (
+                                <code
+                                  style={{
+                                    whiteSpace: "pre-wrap",
+                                    wordBreak: "break-all",
+                                    wordWrap: "break-word",
+                                    padding: "2px 4px",
+                                    backgroundColor: "rgba(175, 184, 193, 0.2)",
+                                    borderRadius: "4px",
+                                    fontSize: "0.9em",
+                                    maxWidth: "100%",
+                                  }}
+                                  {...props}
+                                >
+                                  {children}
+                                </code>
+                              );
+                            },
+                          }}
+                        >
+                          {message.lastAnswer}
+                        </Markdown>
                         {message.lastAnswer && !message.lastAnswerLoading && (
                           <div
                             style={{
@@ -625,7 +785,7 @@ function App() {
                               <path
                                 d="M13.653333 45.83619h975.238096v975.238096h-975.238096z"
                                 fill="currentColor"
-                                fill-opacity="0"
+                                fillOpacity="0"
                               ></path>
                               <path
                                 d="M843.093333 417.889524l-147.748571-0.487619c-4.87619 0-9.264762-0.975238-13.653333-2.925715a42.325333 42.325333 0 0 1-11.215239-7.801904 29.647238 29.647238 0 0 1-7.314285-11.702857 32.719238 32.719238 0 0 1 0-27.306667c1.462857-4.388571 3.900952-8.289524 7.314285-11.702857 3.413333-2.925714 7.314286-5.851429 11.215239-7.314286 4.388571-1.950476 8.777143-2.925714 13.653333-2.925714l77.531428 0.487619a35.742476 35.742476 0 0 0 24.868572-10.727619c3.413333-3.413333 5.851429-7.314286 7.314286-11.702857 1.950476-4.388571 2.925714-8.777143 2.925714-13.653334l0.487619-74.605714c0-4.87619 0.975238-9.264762 2.925714-13.653333 1.462857-4.388571 3.900952-8.289524 7.314286-11.702857 3.413333-3.413333 7.314286-5.851429 11.215238-7.801905 4.388571-1.950476 8.777143-2.438095 13.653333-2.438095 4.388571 0 8.777143 0.487619 13.165715 2.438095 4.388571 1.950476 8.289524 4.388571 11.215238 7.801905 3.413333 3.413333 5.851429 7.314286 7.801905 11.702857 1.462857 4.388571 2.438095 8.777143 2.438095 13.653333l-0.487619 146.773333c0 4.87619-0.487619 9.264762-2.438096 13.653334-1.950476 4.388571-4.388571 7.801905-7.314285 11.215238-3.413333 3.413333-7.314286 5.851429-11.215238 7.801905-4.388571 1.950476-8.777143 2.925714-13.653334 2.925714zM126.293333 840.167619l0.487619-145.798095c0-4.388571 0.975238-9.264762 2.438096-13.653334a37.839238 37.839238 0 0 1 19.017142-19.504761 32.182857 32.182857 0 0 1 13.165715-2.925715l148.23619 0.487619c4.388571 0 8.777143 0.975238 13.165715 2.925715 4.388571 1.950476 8.289524 4.388571 11.215238 7.801904 3.413333 3.413333 5.851429 7.314286 7.801904 11.702858 1.462857 4.388571 2.438095 9.264762 2.438096 14.140952 0 4.388571-0.975238 9.264762-2.438096 13.653333-1.950476 4.388571-4.388571 8.289524-7.801904 11.702857-2.925714 3.413333-6.826667 5.851429-11.215238 7.801905a32.182857 32.182857 0 0 1-13.165715 2.925714l-78.019047-0.487619a32.182857 32.182857 0 0 0-13.165715 2.925715c-4.388571 1.950476-8.289524 4.388571-11.215238 7.801904-3.413333 3.413333-5.851429 7.314286-7.801905 11.702858a45.348571 45.348571 0 0 0-2.438095 14.140952l-0.487619 72.655238c0 4.87619-0.975238 9.264762-2.925714 14.140952-1.950476 4.388571-4.388571 8.289524-7.314286 11.702858-3.413333 3.413333-7.314286 5.851429-11.702857 7.801904a37.205333 37.205333 0 0 1-26.331429 0 37.839238 37.839238 0 0 1-11.702857-7.801904 36.473905 36.473905 0 0 1-7.314285-11.702858 34.962286 34.962286 0 0 1-2.925715-14.140952z"

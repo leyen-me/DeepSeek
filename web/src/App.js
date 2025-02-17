@@ -7,7 +7,8 @@ import { vscDarkPlus } from "react-syntax-highlighter/dist/esm/styles/prism";
 import remarkMath from "remark-math";
 import rehypeKatex from "rehype-katex";
 import remarkGfm from "remark-gfm";
-import { isMobile } from 'react-device-detect';
+import { isMobile } from "react-device-detect";
+import { message as Message } from "antd";
 
 const { TextArea } = Input;
 
@@ -96,6 +97,9 @@ function App() {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [shouldAutoScroll, setShouldAutoScroll] = useState(true);
   const isScrollingRef = useRef(false);
+  const [isDeepThink, setIsDeepThink] = useState(
+    localStorage.getItem("deep_think") === "true"
+  );
 
   // All messages
   const [allMessages, setAllMessages] = useState(
@@ -147,6 +151,10 @@ function App() {
       older: sortedMessages.filter((msg) => new Date(msg.createdAt) < monthAgo),
     };
   };
+
+  useEffect(() => {
+    localStorage.setItem("deep_think", isDeepThink);
+  }, [isDeepThink]);
 
   // Add useEffect to update groupedMessages when allMessages changes
   useEffect(() => {
@@ -257,7 +265,12 @@ function App() {
     // 创建新的 AbortController
     controllerRef.current = new AbortController();
 
-    fetch("https://ds.leyen.me/stream", {
+    let url = "https://ds.leyen.me/v3/stream";
+    if (isDeepThink) {
+      url = "https://ds.leyen.me/stream";
+    }
+
+    fetch(url, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -289,8 +302,10 @@ function App() {
                 return;
               }
               const text = new TextDecoder().decode(value);
+              console.log("======>", text);
+
               // 如果碰到=== Final Answer ===，则是最后回答
-              if (text.includes("=== Final Answer ===")) {
+              if (text.includes("=== Final Answer ===") || !isDeepThink) {
                 lastAnswer = true;
                 let _text = text.replace("=== Final Answer ===", "");
                 lastAccumulatedContent += _text;
@@ -460,9 +475,10 @@ function App() {
       await navigator.clipboard.writeText(
         message.content + "\n\n" + message.lastAnswer
       );
-      alert("复制成功!");
+      Message.success("复制成功!");
     } catch (err) {
       console.error("复制失败:", err);
+      Message.error("复制失败!");
     }
   };
 
@@ -488,6 +504,11 @@ function App() {
   };
 
   const handleNew = () => {
+    if (!isSending && !activeMessage) {
+      Message.warning("你已经在新的对话中了！");
+      return;
+    }
+
     // 停止当前对话
     handleStop();
 
@@ -507,11 +528,32 @@ function App() {
   };
 
   const handleClear = () => {
-    // 停止当前对话
-    handleStop();
-    setAllMessages([]);
-    setActiveMessage("");
-    handleCloseDrawer();
+    // 基础用法
+    Modal.confirm({
+      title: "确认清除",
+      content: "确定要清除所有记录吗？",
+      onOk() {
+        // 停止当前对话
+        handleStop();
+        setAllMessages([]);
+        setActiveMessage("");
+        handleCloseDrawer();
+        Message.success("清除成功！");
+      },
+      onCancel() {},
+    });
+  };
+
+  const handleDeepThink = () => {
+    // 对话中不允许修改
+    if (isSending) {
+      return;
+    }
+    setIsDeepThink(!isDeepThink);
+  };
+
+  const handleUseNetwork = () => {
+    Message.warning("等待开发！");
   };
 
   return (
@@ -655,8 +697,10 @@ function App() {
                               {
                                 key: "1",
                                 label:
-                                  message.contentLoading &&
-                                  message.contentDuration === null
+                                  !message.content
+                                    ? ""
+                                    : message.contentLoading &&
+                                      message.contentDuration === null
                                     ? "思考中..."
                                     : `已深度思考 （用时 ${message.contentDuration} 秒）`,
                                 children: (
@@ -670,7 +714,9 @@ function App() {
                                       color: "#767676",
                                     }}
                                   >
-                                    {message.content}
+                                    {!message.content && !isDeepThink
+                                      ? "我简单的思考了一下"
+                                      : message.content}
                                   </p>
                                 ),
                               },
@@ -770,8 +816,15 @@ function App() {
                         >
                           {message.lastAnswer}
                         </Markdown>
-                        {((message.lastAnswer && !message.lastAnswerLoading) ||
-                          (message.content && !message.lastAnswerLoading)) && (
+                        {((!isDeepThink &&
+                          message.lastAnswer &&
+                          !message.lastAnswerLoading) ||
+                          (isDeepThink &&
+                            message.lastAnswer &&
+                            !message.lastAnswerLoading) ||
+                          (isDeepThink &&
+                            message.content &&
+                            !message.lastAnswerLoading)) && (
                           <div
                             style={{
                               display: "flex",
@@ -954,12 +1007,14 @@ function App() {
                   display: "flex",
                   alignItems: "center",
                   justifyContent: "center",
-                  backgroundColor: "#E4F0FC",
-                  color: "#407BE3",
+                  backgroundColor: isDeepThink ? "#E4F0FC" : "#F5F5F5",
+                  color: isDeepThink ? "#407BE3" : "#505050",
                   fontSize: "13px",
                   borderRadius: "999px",
                   padding: "0 12px",
+                  cursor: "pointer",
                 }}
+                onClick={handleDeepThink}
               >
                 <svg
                   width="16"
@@ -1007,6 +1062,7 @@ function App() {
                   borderRadius: "999px",
                   padding: "0 12px",
                 }}
+                onClick={handleUseNetwork}
               >
                 <svg
                   width="16"
@@ -1045,6 +1101,7 @@ function App() {
                 height="18"
                 viewBox="0 0 80 80"
                 xmlns="http://www.w3.org/2000/svg"
+                onClick={handleUseNetwork}
               >
                 <path
                   d="M0,40C0,37.791 1.628,36 3.636,36H76.364C78.372,36 80,37.791 80,40C80,42.209 78.372,44 76.364,44H3.636C1.628,44 0,42.209 0,40Z"

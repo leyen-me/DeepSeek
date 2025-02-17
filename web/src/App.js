@@ -7,6 +7,7 @@ import { vscDarkPlus } from "react-syntax-highlighter/dist/esm/styles/prism";
 import remarkMath from "remark-math";
 import rehypeKatex from "rehype-katex";
 import remarkGfm from "remark-gfm";
+import { isMobile } from 'react-device-detect';
 
 const { TextArea } = Input;
 
@@ -178,6 +179,7 @@ function App() {
   }, [activeMessage]);
 
   const controllerRef = useRef(null);
+  const inputRef = useRef(null);
   // Add ref for main container
   const mainRef = useRef(null);
 
@@ -914,6 +916,7 @@ function App() {
         {/* Footer */}
         <footer style={{ padding: "16px" }}>
           <TextArea
+            ref={inputRef}
             value={message}
             onChange={(e) => setMessage(e.target.value)}
             placeholder="给 DeepSeek 发送消息"
@@ -924,6 +927,10 @@ function App() {
             }}
             onKeyDown={(e) => {
               if (e.key === "Enter") {
+                // 移动设备上忽略回车键事件
+                if (isMobile) return;
+
+                // 电脑端保持原有行为
                 if (!e.shiftKey) {
                   e.preventDefault(); // 阻止默认的换行行为
                   handleSendMessage();

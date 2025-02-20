@@ -1,6 +1,15 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, cloneElement } from "react";
 import Markdown from "react-markdown";
-import { Input, Modal, Drawer, Divider, Button, Collapse } from "antd";
+import {
+  Input,
+  Modal,
+  Drawer,
+  Divider,
+  Button,
+  Collapse,
+  theme,
+  Form,
+} from "antd";
 import { nanoid } from "nanoid";
 import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
 import { vscDarkPlus } from "react-syntax-highlighter/dist/esm/styles/prism";
@@ -9,7 +18,10 @@ import rehypeKatex from "rehype-katex";
 import remarkGfm from "remark-gfm";
 import { isMobile } from "react-device-detect";
 import { message as Message } from "antd";
+import { DownOutlined, EditOutlined, DeleteOutlined } from "@ant-design/icons";
+import { Dropdown, Space } from "antd";
 
+const { useToken } = theme;
 const { TextArea } = Input;
 
 const tryJsonParse = (value) => {
@@ -19,6 +31,31 @@ const tryJsonParse = (value) => {
     return [];
   }
 };
+
+// init agent list
+const defaultAgentList = [
+  {
+    code: "default",
+    name: "默认",
+    description: "你是一个AI助手，请根据用户的问题给出回答。",
+  },
+  {
+    code: "philosopher",
+    name: "哲学家",
+    description: "你是一个AI助手，请根据用户的问题给出回答。用哲学家的口气",
+  },
+  {
+    code: "sarcasm",
+    name: "讽刺",
+    description: "你是一个AI助手，请根据用户的问题给出回答。用犀利讽刺的口气",
+  },
+  {
+    code: "remove_ai_flavor",
+    name: "去除AI味",
+    description:
+      "你是一个AI助手，请根据用户的问题给出回答。回答问题时不要太AI口气，有时候来点幽默风趣",
+  },
+];
 
 const CodeBlock = ({ language, children }) => {
   const [copied, setCopied] = useState(false);
@@ -81,7 +118,128 @@ const CodeBlock = ({ language, children }) => {
   );
 };
 
+const Agent = ({
+  currentAgent,
+  agentList,
+  onDeleteAgent,
+  onAddAgent,
+  onItemClick,
+  onEditAgent,
+}) => {
+  const { token } = useToken();
+  const items = agentList.map((agent, index) => ({
+    key: agent.name,
+    label: (
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          borderBottom:
+            index === agentList.length - 1 ? "none" : "1px solid #f0f0f0",
+          padding: "8px",
+          borderRadius: "8px",
+          backgroundColor:
+            currentAgent.name === agent.name ? "#EEE" : "transparent",
+        }}
+        onClick={() => onItemClick(agent)}
+      >
+        <div>
+          <h6 style={{ fontSize: 14, fontWeight: 600 }}>{agent.name}</h6>
+          <p style={{ fontSize: 12, color: token.colorTextSecondary }}>
+            {agent.description}
+          </p>
+        </div>
+        <div style={{ display: "flex", gap: 8 }}>
+          <Button
+            shape="circle"
+            icon={<EditOutlined />}
+            onClick={(e) => {
+              onEditAgent(agent);
+            }}
+          />
+          <Button
+            shape="circle"
+            danger
+            disabled={agent.code === currentAgent.code}
+            icon={<DeleteOutlined />}
+            onClick={(e) => {
+              e.stopPropagation();
+              onDeleteAgent(agent);
+            }}
+          />
+        </div>
+      </div>
+    ),
+  }));
+
+  const contentStyle = {
+    backgroundColor: token.colorBgElevated,
+    borderRadius: token.borderRadiusLG,
+    boxShadow: token.boxShadowSecondary,
+    width: "90%",
+  };
+
+  const menuStyle = {
+    boxShadow: "none",
+    maxHeight: "360px",
+    overflowY: "auto",
+  };
+
+  return (
+    <Dropdown
+      menu={{ items }}
+      dropdownRender={(menu) => (
+        <div style={contentStyle}>
+          {cloneElement(menu, { style: menuStyle })}
+          <Divider style={{ margin: 0 }} />
+          <Space
+            style={{
+              width: "100%",
+              minWidth: "126px",
+              padding: 8,
+              flexDirection: "flex-end",
+              display: "flex",
+            }}
+          >
+            <Button
+              type="primary"
+              onClick={(e) => {
+                console.log(e);
+                e.stopPropagation();
+                onAddAgent();
+              }}
+            >
+              添加Agent
+            </Button>
+          </Space>
+        </div>
+      )}
+    >
+      <a onClick={(e) => e.preventDefault()}>
+        <Space>
+          {currentAgent.name}
+          <DownOutlined />
+        </Space>
+      </a>
+    </Dropdown>
+  );
+};
+
 function App() {
+  const [agentList, setAgentList] = useState(
+    tryJsonParse(localStorage.getItem("agent_list")) || defaultAgentList
+  );
+  const [currentAgent, setCurrentAgent] = useState(
+    agentList.find(
+      (agent) =>
+        agent.code === localStorage.getItem("current_agent") || "default"
+    )
+  );
+  const [isAgentOpen, setIsAgentOpen] = useState(false);
+  const [agentForm] = Form.useForm();
+  const [isAgentCreate, setIsAgentCreate] = useState("");
+
   const [messages, setMessages] = useState([
     {
       role: "system",
@@ -98,7 +256,9 @@ function App() {
   const [shouldAutoScroll, setShouldAutoScroll] = useState(true);
   const isScrollingRef = useRef(false);
   const [isDeepThink, setIsDeepThink] = useState(
-    localStorage.getItem("deep_think") === "true"
+    localStorage.getItem("deep_think")
+      ? localStorage.getItem("deep_think") === "true"
+      : true
   );
 
   // All messages
@@ -185,6 +345,29 @@ function App() {
       setTitle(_activeMessage.list[1].content);
     }
   }, [activeMessage]);
+
+  useEffect(() => {
+    localStorage.setItem("agent_list", JSON.stringify(agentList));
+    // 更新提示词
+    const _currentAgent = agentList.find(
+      (item) => item.code === currentAgent.code
+    );
+    setMessages((prev) => {
+      const prevMessages = [...prev];
+      prevMessages[0].content = _currentAgent.description;
+      return prevMessages;
+    });
+  }, [agentList]);
+
+  useEffect(() => {
+    localStorage.setItem("current_agent", currentAgent.code);
+    // 更新提示词
+    setMessages((prev) => {
+      const prevMessages = [...prev];
+      prevMessages[0].content = currentAgent.description;
+      return prevMessages;
+    });
+  }, [currentAgent]);
 
   const controllerRef = useRef(null);
   const inputRef = useRef(null);
@@ -556,6 +739,82 @@ function App() {
     Message.warning("等待开发！");
   };
 
+  const handleDeleteAgent = (agent) => {
+    // 当前正在使用的无法删除
+    if (agent.code === currentAgent.code) {
+      Message.warning("无法删除当前正在使用的Agent！");
+      return;
+    }
+    Modal.confirm({
+      title: "确定删除Agent吗？",
+      content: "删除后无法恢复，请谨慎操作。",
+      onOk: () => {
+        const newAgentList = agentList.filter(
+          (item) => item.code !== agent.code
+        );
+        setAgentList(newAgentList);
+      },
+    });
+  };
+
+  const handleAgentItemClick = (agent) => {
+    setCurrentAgent(agent);
+  };
+
+  const handleAddAgent = () => {
+    agentForm.resetFields();
+    setIsAgentCreate("");
+    setIsAgentOpen(true);
+  };
+
+  const handleEditAgent = (agent) => {
+    agentForm.setFieldsValue(agent);
+    setIsAgentCreate(agent.code);
+    setIsAgentOpen(true);
+  };
+
+  const handleAgentEditOk = () => {
+    agentForm.validateFields().then((values) => {
+      // 新增的代码不能唯一
+      if (isAgentCreate) {
+        const otherAgentList = agentList.filter(
+          (item) => item.code !== isAgentCreate
+        );
+        const index = otherAgentList.findIndex(
+          (item) => item.code === values.code
+        );
+        if (index !== -1) {
+          Message.warning("代码不能重复！");
+          return;
+        }
+      } else {
+        const index = agentList.findIndex((item) => item.code === values.code);
+        if (index !== -1) {
+          Message.warning("代码不能重复！");
+          return;
+        }
+      }
+
+      setAgentList((prev) => {
+        const newAgentList = [...prev];
+        const index = newAgentList.findIndex(
+          (item) => item.code === values.code
+        );
+        if (index !== -1) {
+          newAgentList[index] = values;
+        } else {
+          newAgentList.push(values);
+        }
+        return newAgentList;
+      });
+      setIsAgentOpen(false);
+    });
+  };
+
+  const handleAgentEditCancel = () => {
+    setIsAgentOpen(false);
+  };
+
   return (
     <>
       <div
@@ -635,6 +894,23 @@ function App() {
           </button>
         </header>
 
+        <div
+          style={{
+            display: "flex",
+            gap: 8,
+            padding: "16px",
+          }}
+        >
+          <Agent
+            currentAgent={currentAgent}
+            agentList={agentList}
+            onItemClick={handleAgentItemClick}
+            onDeleteAgent={handleDeleteAgent}
+            onAddAgent={handleAddAgent}
+            onEditAgent={handleEditAgent}
+          />
+        </div>
+
         {/* Main Content */}
         {messages.length > 1 ? (
           <main
@@ -696,13 +972,12 @@ function App() {
                             items={[
                               {
                                 key: "1",
-                                label:
-                                  !message.content
-                                    ? ""
-                                    : message.contentLoading &&
-                                      message.contentDuration === null
-                                    ? "思考中..."
-                                    : `已深度思考 （用时 ${message.contentDuration} 秒）`,
+                                label: !message.content
+                                  ? ""
+                                  : message.contentLoading &&
+                                    message.contentDuration === null
+                                  ? "思考中..."
+                                  : `已深度思考 （用时 ${message.contentDuration} 秒）`,
                                 children: (
                                   <p
                                     style={{
@@ -1352,6 +1627,31 @@ function App() {
           placeholder="系统提示词"
           autoSize={{ minRows: 1, maxRows: 6 }}
         />
+      </Modal>
+
+      <Modal
+        title="Agent"
+        open={isAgentOpen}
+        onOk={handleAgentEditOk}
+        onCancel={handleAgentEditCancel}
+        okText="保存"
+        cancelText="取消"
+        zIndex={1800}
+      >
+        <Form form={agentForm} layout="vertical">
+          <Form.Item label="代码" name="code">
+            <Input placeholder="请输入代码(英文且唯一)" />
+          </Form.Item>
+          <Form.Item label="名称" name="name">
+            <Input placeholder="请输入名称" />
+          </Form.Item>
+          <Form.Item label="描述" name="description">
+            <TextArea
+              placeholder="请输入提示词"
+              autoSize={{ minRows: 3, maxRows: 6 }}
+            />
+          </Form.Item>
+        </Form>
       </Modal>
     </>
   );

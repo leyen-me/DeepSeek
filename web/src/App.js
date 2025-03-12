@@ -1,12 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import Markdown from "react-markdown";
-import {
-  Input,
-  Modal,
-  Drawer,
-  Divider,
-  Button,
-} from "antd";
+import { Input, Modal, Drawer, Divider, Button } from "antd";
 import { nanoid } from "nanoid";
 import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
 import { vscDarkPlus } from "react-syntax-highlighter/dist/esm/styles/prism";
@@ -433,7 +427,6 @@ function App() {
     });
   };
 
-
   return (
     <>
       <div
@@ -654,7 +647,7 @@ function App() {
                         >
                           {message.content}
                         </Markdown>
-                        {(message.content && !message.loading) && (
+                        {message.content && !message.loading && (
                           <div
                             style={{
                               display: "flex",
@@ -797,7 +790,17 @@ function App() {
         )}
 
         {/* Footer */}
-        <footer style={{ padding: "16px" }}>
+        <footer
+          style={{
+            padding: "0 16px",
+            marginBottom: "16px",
+            display: "flex",
+            gap: "8px",
+            position: "relative",
+            width: "100%",
+            height: "48px",
+          }}
+        >
           <TextArea
             ref={inputRef}
             value={message}
@@ -821,91 +824,71 @@ function App() {
               }
             }}
           />
-
           <div
             style={{
               display: "flex",
-              justifyContent: "space-between",
               alignItems: "center",
-              marginTop: "4px",
+              position: "absolute",
+              right: "24px",
+              top: "50%",
+              transform: "translateY(-50%)",
             }}
           >
-            <div></div>
-            <div style={{ display: "flex", gap: "16px", alignItems: "center" }}>
-              <svg
-                width="18"
-                height="18"
-                viewBox="0 0 80 80"
-                xmlns="http://www.w3.org/2000/svg"
-              >
-                <path
-                  d="M0,40C0,37.791 1.628,36 3.636,36H76.364C78.372,36 80,37.791 80,40C80,42.209 78.372,44 76.364,44H3.636C1.628,44 0,42.209 0,40Z"
-                  fill="currentColor"
-                  fillRule="evenodd"
-                />
-                <path
-                  d="M40,80C37.791,80 36,78.372 36,76.364L36,3.636C36,1.628 37.791,0 40,0C42.209,0 44,1.628 44,3.636L44,76.364C44,78.372 42.209,80 40,80Z"
-                  fill="currentColor"
-                  fillRule="evenodd"
-                />
-              </svg>
-
-              <div
-                style={{
-                  width: "30px",
-                  height: "30px",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  borderRadius: "999px",
-                  backgroundColor: "#3E81F6",
-                  color: "#fff",
-                  opacity: message.length || isSending ? 1 : 0.4,
-                }}
-                onClick={(e) => {
-                  handleSendMessage();
-                }}
-              >
-                {isSending ? (
-                  <div
-                    style={{
-                      width: "10px",
-                      height: "10px",
-                      backgroundColor: "#fff",
-                    }}
-                  ></div>
-                ) : (
-                  <svg
-                    style={{ transform: "rotate(180deg)" }}
-                    width="14"
-                    height="16"
-                    viewBox="0 0 14 16"
-                    xmlns="http://www.w3.org/2000/svg"
-                  >
-                    <path
-                      d="M7,1.25L7,14.75"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                      strokeLinecap="round"
-                      fill="none"
-                    />
-                    <path
-                      d="M12.5,9.25L7,14.75"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                      strokeLinecap="round"
-                      fill="none"
-                    />
-                    <path
-                      d="M1.5,9.25L7,14.75"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                      strokeLinecap="round"
-                      fill="none"
-                    />
-                  </svg>
-                )}
-              </div>
+            <div
+              style={{
+                width: "36px",
+                height: "36px",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                borderRadius: "999px",
+                backgroundColor: "#3E81F6",
+                color: "#fff",
+                opacity: message.length || isSending ? 1 : 0.4,
+              }}
+              onClick={(e) => {
+                handleSendMessage();
+              }}
+            >
+              {isSending ? (
+                <div
+                  style={{
+                    width: "10px",
+                    height: "10px",
+                    backgroundColor: "#fff",
+                  }}
+                ></div>
+              ) : (
+                <svg
+                  style={{ transform: "rotate(180deg)" }}
+                  width="14"
+                  height="16"
+                  viewBox="0 0 14 16"
+                  xmlns="http://www.w3.org/2000/svg"
+                >
+                  <path
+                    d="M7,1.25L7,14.75"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    fill="none"
+                  />
+                  <path
+                    d="M12.5,9.25L7,14.75"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    fill="none"
+                  />
+                  <path
+                    d="M1.5,9.25L7,14.75"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    fill="none"
+                  />
+                </svg>
+              )}
             </div>
           </div>
         </footer>

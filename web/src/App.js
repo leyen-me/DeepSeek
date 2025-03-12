@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, cloneElement } from "react";
+import { useState, useEffect, useRef } from "react";
 import Markdown from "react-markdown";
 import {
   Input,
@@ -6,9 +6,6 @@ import {
   Drawer,
   Divider,
   Button,
-  Collapse,
-  theme,
-  Form,
 } from "antd";
 import { nanoid } from "nanoid";
 import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
@@ -18,10 +15,7 @@ import rehypeKatex from "rehype-katex";
 import remarkGfm from "remark-gfm";
 import { isMobile } from "react-device-detect";
 import { message as Message } from "antd";
-import { DownOutlined, EditOutlined, DeleteOutlined } from "@ant-design/icons";
-import { Dropdown, Space } from "antd";
 
-const { useToken } = theme;
 const { TextArea } = Input;
 
 const tryJsonParse = (value) => {
@@ -31,31 +25,6 @@ const tryJsonParse = (value) => {
     return [];
   }
 };
-
-// init agent list
-const defaultAgentList = [
-  {
-    code: "default",
-    name: "默认",
-    description: "你是一个AI助手，请根据用户的问题给出回答。",
-  },
-  {
-    code: "philosopher",
-    name: "哲学家",
-    description: "你是一个AI助手，请根据用户的问题给出回答。用哲学家的口气",
-  },
-  {
-    code: "sarcasm",
-    name: "讽刺",
-    description: "你是一个AI助手，请根据用户的问题给出回答。用犀利讽刺的口气",
-  },
-  {
-    code: "remove_ai_flavor",
-    name: "去除AI味",
-    description:
-      "你是一个AI助手，请根据用户的问题给出回答。回答问题时不要太AI口气，有时候来点幽默风趣",
-  },
-];
 
 const CodeBlock = ({ language, children }) => {
   const [copied, setCopied] = useState(false);
@@ -118,148 +87,14 @@ const CodeBlock = ({ language, children }) => {
   );
 };
 
-const Agent = ({
-  currentAgent,
-  agentList,
-  onDeleteAgent,
-  onAddAgent,
-  onItemClick,
-  onEditAgent,
-}) => {
-  const { token } = useToken();
-  const items = agentList.map((agent, index) => ({
-    key: agent.name,
-    label: (
-      <div
-        style={{
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-          borderBottom:
-            index === agentList.length - 1 ? "none" : "1px solid #f0f0f0",
-          padding: "8px",
-          borderRadius: "8px",
-          backgroundColor:
-            currentAgent.name === agent.name ? "#EEE" : "transparent",
-        }}
-        onClick={() => onItemClick(agent)}
-      >
-        <div>
-          <h6 style={{ fontSize: 14, fontWeight: 600 }}>{agent.name}</h6>
-          <p style={{ fontSize: 12, color: token.colorTextSecondary }}>
-            {agent.description}
-          </p>
-        </div>
-        <div style={{ display: "flex", gap: 8 }}>
-          <Button
-            shape="circle"
-            icon={<EditOutlined />}
-            onClick={(e) => {
-              onEditAgent(agent);
-            }}
-          />
-          <Button
-            shape="circle"
-            danger
-            disabled={agent.code === currentAgent.code}
-            icon={<DeleteOutlined />}
-            onClick={(e) => {
-              e.stopPropagation();
-              onDeleteAgent(agent);
-            }}
-          />
-        </div>
-      </div>
-    ),
-  }));
-
-  const contentStyle = {
-    backgroundColor: token.colorBgElevated,
-    borderRadius: token.borderRadiusLG,
-    boxShadow: token.boxShadowSecondary,
-    width: "90%",
-  };
-
-  const menuStyle = {
-    boxShadow: "none",
-    maxHeight: "360px",
-    overflowY: "auto",
-  };
-
-  return (
-    <Dropdown
-      menu={{ items }}
-      dropdownRender={(menu) => (
-        <div style={contentStyle}>
-          {cloneElement(menu, { style: menuStyle })}
-          <Divider style={{ margin: 0 }} />
-          <Space
-            style={{
-              width: "100%",
-              minWidth: "126px",
-              padding: 8,
-              flexDirection: "flex-end",
-              display: "flex",
-            }}
-          >
-            <Button
-              type="primary"
-              onClick={(e) => {
-                console.log(e);
-                e.stopPropagation();
-                onAddAgent();
-              }}
-            >
-              添加Agent
-            </Button>
-          </Space>
-        </div>
-      )}
-    >
-      <a onClick={(e) => e.preventDefault()}>
-        <Space>
-          {currentAgent.name}
-          <DownOutlined />
-        </Space>
-      </a>
-    </Dropdown>
-  );
-};
-
 function App() {
-  const [agentList, setAgentList] = useState(
-    tryJsonParse(localStorage.getItem("agent_list")) || defaultAgentList
-  );
-  const [currentAgent, setCurrentAgent] = useState(
-    agentList.find(
-      (agent) =>
-        agent.code === localStorage.getItem("current_agent") || "default"
-    )
-  );
-  const [isAgentOpen, setIsAgentOpen] = useState(false);
-  const [agentForm] = Form.useForm();
-  const [isAgentCreate, setIsAgentCreate] = useState("");
-
-  const [messages, setMessages] = useState([
-    {
-      role: "system",
-      content:
-        localStorage.getItem("system_prompt") ||
-        "你是一个AI助手，请根据用户的问题给出回答。",
-    },
-  ]);
+  const [messages, setMessages] = useState([]);
   const [message, setMessage] = useState("");
   const [isSending, setIsSending] = useState(false);
   const [title, setTitle] = useState("新对话");
-  const [isSystemOpen, setIsSystemOpen] = useState(false);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [shouldAutoScroll, setShouldAutoScroll] = useState(true);
   const isScrollingRef = useRef(false);
-  const [isDeepThink, setIsDeepThink] = useState(
-    localStorage.getItem("deep_think")
-      ? localStorage.getItem("deep_think") === "true"
-      : true
-  );
 
   // All messages
   const [allMessages, setAllMessages] = useState(
@@ -312,10 +147,6 @@ function App() {
     };
   };
 
-  useEffect(() => {
-    localStorage.setItem("deep_think", isDeepThink);
-  }, [isDeepThink]);
-
   // Add useEffect to update groupedMessages when allMessages changes
   useEffect(() => {
     let _messages = [...allMessages];
@@ -342,32 +173,9 @@ function App() {
     );
     if (_activeMessage) {
       setMessages(_activeMessage.list);
-      setTitle(_activeMessage.list[1].content);
+      setTitle(_activeMessage.list[0].content);
     }
   }, [activeMessage]);
-
-  useEffect(() => {
-    localStorage.setItem("agent_list", JSON.stringify(agentList));
-    // 更新提示词
-    const _currentAgent = agentList.find(
-      (item) => item.code === currentAgent.code
-    );
-    setMessages((prev) => {
-      const prevMessages = [...prev];
-      prevMessages[0].content = _currentAgent.description;
-      return prevMessages;
-    });
-  }, [agentList]);
-
-  useEffect(() => {
-    localStorage.setItem("current_agent", currentAgent.code);
-    // 更新提示词
-    setMessages((prev) => {
-      const prevMessages = [...prev];
-      prevMessages[0].content = currentAgent.description;
-      return prevMessages;
-    });
-  }, [currentAgent]);
 
   const controllerRef = useRef(null);
   const inputRef = useRef(null);
@@ -397,23 +205,6 @@ function App() {
     }
   };
 
-  const handleShowSystem = () => {
-    setIsSystemOpen(true);
-  };
-
-  const handleCloseSystem = () => {
-    setIsSystemOpen(false);
-  };
-
-  const handleSystemChange = (value) => {
-    setMessages((prev) => {
-      const prevMessages = [...prev];
-      prevMessages[0].content = value;
-      return prevMessages;
-    });
-    localStorage.setItem("system_prompt", value);
-  };
-
   const handleOpenDrawer = () => {
     setDrawerOpen(true);
   };
@@ -425,17 +216,12 @@ function App() {
   const getMessage = (newMessages) => {
     let _newMessages1 = newMessages.map((message) => {
       // 如果system prompt是空，则不加入
-      if (message.role === "system" && message.content.trim() === "") {
+      if (message.content.trim() === "") {
         return null;
       }
       return {
         role: message.role,
-        content:
-          message.role === "assistant"
-            ? message.lastAnswer
-              ? message.lastAnswer
-              : message.content
-            : message.content,
+        content: message.content,
       };
     });
     let _newMessages2 = _newMessages1.filter(
@@ -447,26 +233,21 @@ function App() {
   const getStream = (newMessages) => {
     // 创建新的 AbortController
     controllerRef.current = new AbortController();
-
-    let url = "https://ds.leyen.me/v3/stream";
-    if (isDeepThink) {
-      url = "https://ds.leyen.me/stream";
-    }
-
+    let url = "https://ds.leyen.me/v1/stream";
     fetch(url, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
         Accept: "text/event-stream",
       },
-      body: JSON.stringify(getMessage(newMessages)),
+      body: JSON.stringify({
+        messages: getMessage(newMessages),
+      }),
       signal: controllerRef.current.signal,
     })
       .then((response) => {
         let reader = response.body.getReader();
-        let accumulatedContent = "";
-        let lastAccumulatedContent = "";
-        let lastAnswer = false;
+        let allContent = "";
 
         function readStream() {
           reader
@@ -475,9 +256,7 @@ function App() {
               if (done) {
                 setMessages((prev) => {
                   const prevMessages = [...prev];
-                  prevMessages[prevMessages.length - 1][
-                    "lastAnswerLoading"
-                  ] = false;
+                  prevMessages[prevMessages.length - 1]["loading"] = false;
                   return prevMessages;
                 });
                 scrollToBottom();
@@ -487,61 +266,14 @@ function App() {
               const text = new TextDecoder().decode(value);
               console.log("======>", text);
 
-              // 如果碰到=== Final Answer ===，则是最后回答
-              if (text.includes("=== Final Answer ===") || !isDeepThink) {
-                lastAnswer = true;
-                let _text = text.replace("=== Final Answer ===", "");
-                lastAccumulatedContent += _text;
-                setMessages((prev) => {
-                  const prevMessages = [...prev];
-                  prevMessages[prevMessages.length - 1][
-                    "contentLoading"
-                  ] = false;
-                  prevMessages[prevMessages.length - 1][
-                    "lastAnswerLoading"
-                  ] = true;
-                  prevMessages[prevMessages.length - 1]["contentEndTime"] =
-                    new Date();
-                  prevMessages[prevMessages.length - 1]["lastAnswer"] =
-                    lastAccumulatedContent;
-                  prevMessages[prevMessages.length - 1]["contentDuration"] =
-                    Math.round(
-                      (prevMessages[prevMessages.length - 1]["contentEndTime"] -
-                        prevMessages[prevMessages.length - 1][
-                          "contentStartTime"
-                        ]) /
-                        1000
-                    );
-                  return prevMessages;
-                });
-                readStream();
-                return;
-              }
-              if (lastAnswer) {
-                lastAccumulatedContent += text;
-                setMessages((prev) => {
-                  const prevMessages = [...prev];
-                  prevMessages[prevMessages.length - 1]["role"] = "assistant";
-                  prevMessages[prevMessages.length - 1]["content"] =
-                    accumulatedContent;
-                  prevMessages[prevMessages.length - 1]["lastAnswer"] =
-                    lastAccumulatedContent;
+              allContent += text;
+              setMessages((prev) => {
+                const prevMessages = [...prev];
+                prevMessages[prevMessages.length - 1]["content"] = allContent;
+                scrollToBottom();
+                return prevMessages;
+              });
 
-                  scrollToBottom();
-                  return prevMessages;
-                });
-              } else {
-                accumulatedContent += text;
-                setMessages((prev) => {
-                  const prevMessages = [...prev];
-                  prevMessages[prevMessages.length - 1]["role"] = "assistant";
-                  prevMessages[prevMessages.length - 1]["content"] =
-                    accumulatedContent;
-
-                  scrollToBottom();
-                  return prevMessages;
-                });
-              }
               readStream();
             })
             .catch((err) => {
@@ -563,8 +295,7 @@ function App() {
         }
         setMessages((prev) => {
           const prevMessages = [...prev];
-          prevMessages[prevMessages.length - 1]["contentLoading"] = false;
-          prevMessages[prevMessages.length - 1]["lastAnswerLoading"] = false;
+          prevMessages[prevMessages.length - 1]["loading"] = false;
           return prevMessages;
         });
         setIsSending(false);
@@ -586,14 +317,7 @@ function App() {
       }
       setMessages((prev) => {
         const prevMessages = [...prev];
-        prevMessages[prevMessages.length - 1]["contentLoading"] = false;
-        prevMessages[prevMessages.length - 1]["lastAnswerLoading"] = false;
-        prevMessages[prevMessages.length - 1]["contentEndTime"] = new Date();
-        prevMessages[prevMessages.length - 1]["contentDuration"] = Math.round(
-          (prevMessages[prevMessages.length - 1]["contentEndTime"] -
-            prevMessages[prevMessages.length - 1]["contentStartTime"]) /
-            1000
-        );
+        prevMessages[prevMessages.length - 1]["loading"] = false;
         return prevMessages;
       });
       setIsSending(false);
@@ -624,16 +348,11 @@ function App() {
       {
         role: "assistant",
         content: "",
-        contentLoading: true,
-        contentStartTime: new Date(),
-        contentEndTime: null,
-        contentDuration: null,
-        lastAnswer: "",
-        lastAnswerLoading: false,
+        loading: true,
       },
     ];
     if (title === "新对话") {
-      setTitle(newMessages[1].content);
+      setTitle(newMessages[0].content);
     }
     setMessages(newMessages);
     setMessage("");
@@ -673,13 +392,7 @@ function App() {
     // 初始化最后一条对话
     newMessages[newMessages.length - 1]["role"] = "assistant";
     newMessages[newMessages.length - 1]["content"] = "";
-    newMessages[newMessages.length - 1]["contentLoading"] = true;
-    newMessages[newMessages.length - 1]["contentStartTime"] = new Date();
-    newMessages[newMessages.length - 1]["contentEndTime"] = null;
-    newMessages[newMessages.length - 1]["contentDuration"] = null;
-    newMessages[newMessages.length - 1]["contentDuration"] = null;
-    newMessages[newMessages.length - 1]["lastAnswer"] = "";
-    newMessages[newMessages.length - 1]["lastAnswerLoading"] = false;
+    newMessages[newMessages.length - 1]["loading"] = true;
     setMessages(newMessages);
 
     // 重新提问
@@ -696,14 +409,7 @@ function App() {
     handleStop();
 
     // 清空对话
-    setMessages([
-      {
-        role: "system",
-        content:
-          localStorage.getItem("system_prompt") ||
-          "你是一个AI助手，请根据用户的问题给出回答。",
-      },
-    ]);
+    setMessages([]);
 
     setActiveMessage("");
     setMessage("");
@@ -727,93 +433,6 @@ function App() {
     });
   };
 
-  const handleDeepThink = () => {
-    // 对话中不允许修改
-    if (isSending) {
-      return;
-    }
-    setIsDeepThink(!isDeepThink);
-  };
-
-  const handleUseNetwork = () => {
-    Message.warning("等待开发！");
-  };
-
-  const handleDeleteAgent = (agent) => {
-    // 当前正在使用的无法删除
-    if (agent.code === currentAgent.code) {
-      Message.warning("无法删除当前正在使用的Agent！");
-      return;
-    }
-    Modal.confirm({
-      title: "确定删除Agent吗？",
-      content: "删除后无法恢复，请谨慎操作。",
-      onOk: () => {
-        const newAgentList = agentList.filter(
-          (item) => item.code !== agent.code
-        );
-        setAgentList(newAgentList);
-      },
-    });
-  };
-
-  const handleAgentItemClick = (agent) => {
-    setCurrentAgent(agent);
-  };
-
-  const handleAddAgent = () => {
-    agentForm.resetFields();
-    setIsAgentCreate("");
-    setIsAgentOpen(true);
-  };
-
-  const handleEditAgent = (agent) => {
-    agentForm.setFieldsValue(agent);
-    setIsAgentCreate(agent.code);
-    setIsAgentOpen(true);
-  };
-
-  const handleAgentEditOk = () => {
-    agentForm.validateFields().then((values) => {
-      // 新增的代码不能唯一
-      if (isAgentCreate) {
-        const otherAgentList = agentList.filter(
-          (item) => item.code !== isAgentCreate
-        );
-        const index = otherAgentList.findIndex(
-          (item) => item.code === values.code
-        );
-        if (index !== -1) {
-          Message.warning("代码不能重复！");
-          return;
-        }
-      } else {
-        const index = agentList.findIndex((item) => item.code === values.code);
-        if (index !== -1) {
-          Message.warning("代码不能重复！");
-          return;
-        }
-      }
-
-      setAgentList((prev) => {
-        const newAgentList = [...prev];
-        const index = newAgentList.findIndex(
-          (item) => item.code === values.code
-        );
-        if (index !== -1) {
-          newAgentList[index] = values;
-        } else {
-          newAgentList.push(values);
-        }
-        return newAgentList;
-      });
-      setIsAgentOpen(false);
-    });
-  };
-
-  const handleAgentEditCancel = () => {
-    setIsAgentOpen(false);
-  };
 
   return (
     <>
@@ -853,7 +472,6 @@ function App() {
             </svg>
           </button>
           <h1
-            onClick={handleShowSystem}
             style={{
               margin: 0,
               fontSize: "15px",
@@ -894,25 +512,8 @@ function App() {
           </button>
         </header>
 
-        <div
-          style={{
-            display: "flex",
-            gap: 8,
-            padding: "16px",
-          }}
-        >
-          <Agent
-            currentAgent={currentAgent}
-            agentList={agentList}
-            onItemClick={handleAgentItemClick}
-            onDeleteAgent={handleDeleteAgent}
-            onAddAgent={handleAddAgent}
-            onEditAgent={handleEditAgent}
-          />
-        </div>
-
         {/* Main Content */}
-        {messages.length > 1 ? (
+        {messages.length ? (
           <main
             ref={mainRef}
             onScroll={handleScroll}
@@ -924,9 +525,7 @@ function App() {
             }}
           >
             {messages.map((message, index) => {
-              return message.role === "system" ? (
-                <div key={index}></div>
-              ) : (
+              return (
                 <div
                   key={index}
                   style={{
@@ -938,11 +537,10 @@ function App() {
                   }}
                 >
                   {message.role === "assistant" ? (
-                    <div style={{ width: "100%" }}>
+                    <div style={{ width: "100%", display: "flex" }}>
                       <div
                         style={{
                           display: "flex",
-                          width: "100%",
                           justifyContent: "flex-start",
                         }}
                       >
@@ -964,46 +562,11 @@ function App() {
                             alt="assistant"
                           />
                         </div>
-                        {
-                          <Collapse
-                            style={{ width: "0", flex: 1 }}
-                            defaultActiveKey={["1"]}
-                            ghost
-                            items={[
-                              {
-                                key: "1",
-                                label: !message.content
-                                  ? ""
-                                  : message.contentLoading &&
-                                    message.contentDuration === null
-                                  ? "思考中..."
-                                  : `已深度思考 （用时 ${message.contentDuration} 秒）`,
-                                children: (
-                                  <p
-                                    style={{
-                                      letterSpacing: "1px",
-                                      paddingLeft: "12px",
-                                      fontSize: "14px",
-                                      lineHeight: "24px",
-                                      borderLeft: "1.5px solid #E4E4E4",
-                                      color: "#767676",
-                                    }}
-                                  >
-                                    {!message.content && !isDeepThink
-                                      ? "我简单的思考了一下"
-                                      : message.content}
-                                  </p>
-                                ),
-                              },
-                            ]}
-                          />
-                        }
                       </div>
                       <div
                         style={{
                           maxWidth: "100%",
                           padding: "0px 16px",
-                          marginLeft: "32px",
                           lineHeight: "28px",
                           fontSize: "16px",
                           letterSpacing: "2px",
@@ -1089,17 +652,9 @@ function App() {
                             },
                           }}
                         >
-                          {message.lastAnswer}
+                          {message.content}
                         </Markdown>
-                        {((!isDeepThink &&
-                          message.lastAnswer &&
-                          !message.lastAnswerLoading) ||
-                          (isDeepThink &&
-                            message.lastAnswer &&
-                            !message.lastAnswerLoading) ||
-                          (isDeepThink &&
-                            message.content &&
-                            !message.lastAnswerLoading)) && (
+                        {(message.content && !message.loading) && (
                           <div
                             style={{
                               display: "flex",
@@ -1275,108 +830,13 @@ function App() {
               marginTop: "4px",
             }}
           >
-            <div style={{ display: "flex", gap: "8px" }}>
-              <div
-                style={{
-                  height: "36px",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  backgroundColor: isDeepThink ? "#E4F0FC" : "#F5F5F5",
-                  color: isDeepThink ? "#407BE3" : "#505050",
-                  fontSize: "13px",
-                  borderRadius: "999px",
-                  padding: "0 12px",
-                  cursor: "pointer",
-                }}
-                onClick={handleDeepThink}
-              >
-                <svg
-                  width="16"
-                  height="16"
-                  viewBox="0 0 22 22"
-                  fill="none"
-                  xmlns="http://www.w3.org/2000/svg"
-                >
-                  <g clipPath="url(#clip0_1_1)">
-                    <path
-                      d="M12.76 11C12.76 11.972 11.972 12.76 11 12.76C10.028 12.76 9.24 11.972 9.24 11C9.24 10.028 10.028 9.24 11 9.24C11.972 9.24 12.76 10.028 12.76 11Z"
-                      fill="currentColor"
-                    />
-                    <path
-                      fillRule="evenodd"
-                      clipRule="evenodd"
-                      d="M7.581 17.96C9.47 17.306 11.716 15.885 13.8 13.8C15.884 11.716 17.305 9.47 17.96 7.581C18.653 5.581 18.345 4.5 17.923 4.078C17.5 3.655 16.419 3.348 14.419 4.04C12.53 4.695 10.284 6.116 8.2 8.2C6.116 10.284 4.695 12.53 4.04 14.419C3.347 16.419 3.655 17.5 4.077 17.923C4.5 18.345 5.581 18.653 7.581 17.96ZM2.988 19.012C5.136 21.16 10.465 19.314 14.889 14.889C19.314 10.465 21.159 5.137 19.011 2.989C16.864 0.841 11.536 2.686 7.111 7.111C2.686 11.536 0.841 16.864 2.988 19.012Z"
-                      fill="currentColor"
-                    />
-                    <path
-                      fillRule="evenodd"
-                      clipRule="evenodd"
-                      d="M4.04 7.581C4.695 9.47 6.116 11.716 8.2 13.8C10.284 15.885 12.53 17.306 14.419 17.96C16.419 18.653 17.5 18.345 17.923 17.923C18.345 17.5 18.653 16.419 17.96 14.419C17.306 12.53 15.884 10.284 13.8 8.2C11.716 6.116 9.47 4.695 7.581 4.04C5.581 3.347 4.5 3.655 4.077 4.078C3.655 4.5 3.347 5.581 4.04 7.581ZM2.989 2.989C0.841 5.136 2.686 10.465 7.111 14.889C11.536 19.314 16.864 21.16 19.011 19.012C21.159 16.864 19.314 11.536 14.889 7.111C10.465 2.686 5.136 0.841 2.989 2.989Z"
-                      fill="currentColor"
-                    />
-                  </g>
-                  <defs>
-                    <clipPath id="clip0_1_1">
-                      <rect width="22" height="22" fill="white" />
-                    </clipPath>
-                  </defs>
-                </svg>
-                <span style={{ marginLeft: "4px" }}>深度思考（R1）</span>
-              </div>
-
-              <div
-                style={{
-                  height: "36px",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  backgroundColor: "#F5F5F5",
-                  color: "#505050",
-                  fontSize: "13px",
-                  borderRadius: "999px",
-                  padding: "0 12px",
-                }}
-                onClick={handleUseNetwork}
-              >
-                <svg
-                  width="16"
-                  height="16"
-                  viewBox="0 0 22 22"
-                  fill="none"
-                  xmlns="http://www.w3.org/2000/svg"
-                >
-                  <path
-                    fillRule="evenodd"
-                    d="M19.178 11.77H2.31V10.23H19.178V11.77Z"
-                    fill="currentColor"
-                  />
-                  <path
-                    fillRule="evenodd"
-                    d="M11.31 2.944C9.691 4.689 8.58 7.616 8.58 11C8.58 14.384 9.691 17.311 11.31 19.056L10.18 20.104C8.244 18.015 7.04 14.685 7.04 11C7.04 7.315 8.244 3.985 10.18 1.896L11.31 2.944Z"
-                    fill="currentColor"
-                  />
-                  <path
-                    fillRule="evenodd"
-                    d="M10.8 2.944C12.419 4.689 13.53 7.616 13.53 11C13.53 14.384 12.419 17.311 10.8 19.056L11.93 20.104C13.866 18.015 15.07 14.685 15.07 11C15.07 7.315 13.866 3.985 11.93 1.896L10.8 2.944Z"
-                    fill="currentColor"
-                  />
-                  <path
-                    fillRule="evenodd"
-                    d="M11.055 18.92C15.399 18.92 18.92 15.399 18.92 11.055C18.92 6.711 15.399 3.19 11.055 3.19C6.711 3.19 3.19 6.711 3.19 11.055C3.19 15.399 6.711 18.92 11.055 18.92ZM11.055 20.35C16.188 20.35 20.35 16.188 20.35 11.055C20.35 5.921 16.188 1.76 11.055 1.76C5.922 1.76 1.76 5.921 1.76 11.055C1.76 16.188 5.922 20.35 11.055 20.35Z"
-                    fill="currentColor"
-                  />
-                </svg>
-                <span style={{ marginLeft: "4px" }}>联网搜索</span>
-              </div>
-            </div>
+            <div></div>
             <div style={{ display: "flex", gap: "16px", alignItems: "center" }}>
               <svg
                 width="18"
                 height="18"
                 viewBox="0 0 80 80"
                 xmlns="http://www.w3.org/2000/svg"
-                onClick={handleUseNetwork}
               >
                 <path
                   d="M0,40C0,37.791 1.628,36 3.636,36H76.364C78.372,36 80,37.791 80,40C80,42.209 78.372,44 76.364,44H3.636C1.628,44 0,42.209 0,40Z"
@@ -1486,7 +946,7 @@ function App() {
                         whiteSpace: "nowrap",
                       }}
                     >
-                      {message.list[1].content}
+                      {message.list[0].content}
                     </li>
                   ))}
                 </ul>
@@ -1516,7 +976,7 @@ function App() {
                         whiteSpace: "nowrap",
                       }}
                     >
-                      {message.list[1].content}
+                      {message.list[0].content}
                     </li>
                   ))}
                 </ul>
@@ -1546,7 +1006,7 @@ function App() {
                         whiteSpace: "nowrap",
                       }}
                     >
-                      {message.list[1].content}
+                      {message.list[0].content}
                     </li>
                   ))}
                 </ul>
@@ -1576,7 +1036,7 @@ function App() {
                         whiteSpace: "nowrap",
                       }}
                     >
-                      {message.list[1].content}
+                      {message.list[0].content}
                     </li>
                   ))}
                 </ul>
@@ -1602,7 +1062,7 @@ function App() {
                         lineHeight: "44px",
                       }}
                     >
-                      {message.list[1].content}
+                      {message.list[0].content}
                     </li>
                   ))}
                 </ul>
@@ -1615,44 +1075,6 @@ function App() {
           </Button>
         </div>
       </Drawer>
-      <Modal
-        title="系统提示"
-        open={isSystemOpen}
-        onOk={handleCloseSystem}
-        onCancel={handleCloseSystem}
-      >
-        <TextArea
-          value={messages[0].content}
-          onChange={(e) => handleSystemChange(e.target.value)}
-          placeholder="系统提示词"
-          autoSize={{ minRows: 1, maxRows: 6 }}
-        />
-      </Modal>
-
-      <Modal
-        title="Agent"
-        open={isAgentOpen}
-        onOk={handleAgentEditOk}
-        onCancel={handleAgentEditCancel}
-        okText="保存"
-        cancelText="取消"
-        zIndex={1800}
-      >
-        <Form form={agentForm} layout="vertical">
-          <Form.Item label="代码" name="code">
-            <Input placeholder="请输入代码(英文且唯一)" />
-          </Form.Item>
-          <Form.Item label="名称" name="name">
-            <Input placeholder="请输入名称" />
-          </Form.Item>
-          <Form.Item label="描述" name="description">
-            <TextArea
-              placeholder="请输入提示词"
-              autoSize={{ minRows: 3, maxRows: 6 }}
-            />
-          </Form.Item>
-        </Form>
-      </Modal>
     </>
   );
 }

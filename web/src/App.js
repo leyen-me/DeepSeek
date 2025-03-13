@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import Markdown from "react-markdown";
-import { Input, Modal, Drawer, Divider, Button } from "antd";
+import { Input, Modal, Drawer, Divider, Button, Flex, Spin } from "antd";
 import { nanoid } from "nanoid";
 import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
 import { vscDarkPlus } from "react-syntax-highlighter/dist/esm/styles/prism";
@@ -9,6 +9,7 @@ import rehypeKatex from "rehype-katex";
 import remarkGfm from "remark-gfm";
 import { isMobile } from "react-device-detect";
 import { message as Message } from "antd";
+import { LoadingOutlined } from "@ant-design/icons";
 
 const { TextArea } = Input;
 
@@ -227,7 +228,8 @@ function App() {
   const getStream = (newMessages) => {
     // 创建新的 AbortController
     controllerRef.current = new AbortController();
-    let url = "https://ds.leyen.me/v1/stream";
+    let url = "http://localhost:5000/v1/stream";
+    // let url = "https://ds.leyen.me/v1/stream";
     fetch(url, {
       method: "POST",
       headers: {
@@ -258,9 +260,21 @@ function App() {
                 return;
               }
               const text = new TextDecoder().decode(value);
-              console.log("======>", text);
 
-              allContent += text;
+              if (text.includes("__tool__:")) {
+                const tool_info = JSON.parse(text.split("__tool__:")[1]);
+                setMessages((prev) => {
+                  const prevMessages = [...prev];
+                  prevMessages[prevMessages.length - 1]["toolList"].push(
+                    tool_info
+                  );
+                  return prevMessages;
+                });
+              } else {
+                console.log(text);
+                allContent += text;
+              }
+
               setMessages((prev) => {
                 const prevMessages = [...prev];
                 prevMessages[prevMessages.length - 1]["content"] = allContent;
@@ -343,6 +357,7 @@ function App() {
         role: "assistant",
         content: "",
         loading: true,
+        toolList: [],
       },
     ];
     if (title === "新对话") {
@@ -368,9 +383,7 @@ function App() {
 
   const handleCopy = async (message) => {
     try {
-      await navigator.clipboard.writeText(
-        message.content + "\n\n" + message.lastAnswer
-      );
+      await navigator.clipboard.writeText(message.content);
       Message.success("复制成功!");
     } catch (err) {
       console.error("复制失败:", err);
@@ -387,6 +400,7 @@ function App() {
     newMessages[newMessages.length - 1]["role"] = "assistant";
     newMessages[newMessages.length - 1]["content"] = "";
     newMessages[newMessages.length - 1]["loading"] = true;
+    newMessages[newMessages.length - 1]["toolList"] = [];
     setMessages(newMessages);
 
     // 重新提问
@@ -566,6 +580,36 @@ function App() {
                           color: "#000",
                         }}
                       >
+                        {message.toolList && message.toolList.length > 0 && (
+                          <div
+                            style={{
+                              display: "inline-flex",
+                              alignItems: "center",
+                              backgroundColor: "#000000",
+                              color: "#FFFFFF",
+                              padding: "0px 8px",
+                              borderRadius: "6px",
+                              fontSize: "12px",
+                              marginTop: "10px",
+                              gap: "8px",
+                            }}
+                          >
+                            {message.toolList[message.toolList.length - 1]
+                              .loading && (
+                              <Spin
+                                style={{
+                                  color: "#FFFFFF",
+                                }}
+                                indicator={<LoadingOutlined spin />}
+                                size="small"
+                              />
+                            )}
+                            {
+                              message.toolList[message.toolList.length - 1]
+                                .loading_text
+                            }
+                          </div>
+                        )}
                         {/* https://github.com/remarkjs/react-markdown */}
                         <Markdown
                           remarkPlugins={[remarkMath, remarkGfm]}

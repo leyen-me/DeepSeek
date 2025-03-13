@@ -228,8 +228,8 @@ function App() {
   const getStream = (newMessages) => {
     // 创建新的 AbortController
     controllerRef.current = new AbortController();
-    let url = "http://localhost:5000/v1/stream";
-    // let url = "https://ds.leyen.me/v1/stream";
+    // let url = "http://localhost:5000/v1/stream";
+    let url = "https://ds.leyen.me/v1/stream";
     fetch(url, {
       method: "POST",
       headers: {

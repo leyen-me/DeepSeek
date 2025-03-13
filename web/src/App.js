@@ -657,6 +657,19 @@ function App() {
                                 {children}
                               </td>
                             ),
+                            a: ({ node, children, ...props }) => (
+                              <a
+                                style={{
+                                  wordBreak: "break-all",
+                                  overflowWrap: "break-word",
+                                  textDecoration: "underline",
+                                  color: "#3E81F6",
+                                }}
+                                {...props}
+                              >
+                                {children}
+                              </a>
+                            ),
                             pre: ({ children }) => children,
                             code: ({
                               node,
@@ -792,7 +805,14 @@ function App() {
                           message.role === "user" ? "#EBF3FE" : "transparent",
                       }}
                     >
-                      <p>{message.content}</p>
+                      <p
+                        style={{
+                          wordBreak: "break-all",
+                          overflowWrap: "break-word",
+                        }}
+                      >
+                        {message.content}
+                      </p>
                     </div>
                   )}
                 </div>
@@ -847,7 +867,7 @@ function App() {
             gap: "8px",
             position: "relative",
             width: "100%",
-            height: "48px",
+            minHeight: "48px",
           }}
         >
           <TextArea
@@ -879,8 +899,7 @@ function App() {
               alignItems: "center",
               position: "absolute",
               right: "24px",
-              top: "50%",
-              transform: "translateY(-50%)",
+              bottom: "6px",
             }}
           >
             <div

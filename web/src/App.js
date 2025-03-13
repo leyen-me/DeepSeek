@@ -262,14 +262,19 @@ function App() {
               const text = new TextDecoder().decode(value);
 
               if (text.includes("__tool__:")) {
-                const tool_info = JSON.parse(text.split("__tool__:")[1]);
-                setMessages((prev) => {
-                  const prevMessages = [...prev];
-                  prevMessages[prevMessages.length - 1]["toolList"].push(
-                    tool_info
-                  );
-                  return prevMessages;
-                });
+                let tool_info = null;
+                try {
+                  tool_info = JSON.parse(text.split("__tool__:")[1]);
+                  setMessages((prev) => {
+                    const prevMessages = [...prev];
+                    prevMessages[prevMessages.length - 1]["toolList"].push(
+                      tool_info
+                    );
+                    return prevMessages;
+                  });
+                } catch (err) {
+                  console.log("tool_info_error", err);
+                }
               } else {
                 console.log(text);
                 allContent += text;

@@ -261,7 +261,7 @@ function App() {
               }
               const text = new TextDecoder().decode(value);
 
-              if (text.includes("__tool__:")) {
+              if (text.startsWith("__tool__:")) {
                 let tool_info = null;
                 try {
                   tool_info = JSON.parse(text.split("__tool__:")[1]);
@@ -877,9 +877,6 @@ function App() {
             placeholder="给 DeepSeek 发送消息"
             autoSize={{ minRows: 1, maxRows: 6 }}
             className="deepseek-message-input"
-            styles={{
-              borderRadius: "24px",
-            }}
             onKeyDown={(e) => {
               if (e.key === "Enter") {
                 // 移动设备上忽略回车键事件
